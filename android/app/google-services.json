@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "359537542451",
+    "project_id": "parking-pool-48cd9",
+    "storage_bucket": "parking-pool-48cd9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:359537542451:android:8868898fc7ab8499c2aa46",
+        "android_client_info": {
+          "package_name": "com.example.parking_pool"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBir5_44qQdl9jsndvxlpXX6XqHnymqeNw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
