@@ -224,14 +224,10 @@ class _ProfilePageState extends State<ProfilePage> {
                       borderRadius: BorderRadius.circular(15),
                     ),
                   ),
-                  onPressed: isLoading
-                      ? null
-                      : () async {
+                  onPressed: () async {
                           /* Logica Firebase... */
                         },
-                  child: isLoading
-                      ? const CircularProgressIndicator()
-                      : Text(
+                  child: Text(
                           "Aggiorna Password",
                           style: TextStyle(
                             color: isDark ? Colors.black : Colors.white,
