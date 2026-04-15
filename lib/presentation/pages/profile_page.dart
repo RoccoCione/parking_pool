@@ -12,7 +12,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // --- FUNZIONE INFORMAZIONI RIPRISTINATA E ADATTATA AL TEMA ---
+  // --- FUNZIONE INFORMAZIONI ---
   void _showInfoBottomSheet(BuildContext context) {
     final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
 
@@ -50,7 +50,7 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 20),
             Text(
               "Parking Pool è un'iniziativa nata per semplificare la ricerca del parcheggio all'interno della nostra comunità. \n\n"
-              "L'obiettivo è creare una rete collaborativa tra studenti, docenti e personale: chi sta per lasciare un posto auto può segnalarlo in tempo reale, permettendo a chi arriva di trovarlo senza stress.",
+              "L'obiettivo è creare una rete collaborativa: chi sta per lasciare un posto auto può segnalarlo in tempo reale, riducendo drasticamente il 'cruising for parking' e le emissioni di CO2 del campus.",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
@@ -138,10 +138,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         'nome': nomeController.text.trim(),
                         'cognome': cognomeController.text.trim(),
                       });
-                  if (mounted) {
-                    Navigator.pop(context);
-                    setState(() {});
-                  }
+                  if (mounted) Navigator.pop(context);
                 },
                 child: Text(
                   "Salva",
@@ -156,12 +153,12 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  // --- FUNZIONE CAMBIO PASSWORD ---
   void _showChangePassword(BuildContext context) {
     final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
     final oldPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
-    bool isLoading = false;
 
     showModalBottomSheet(
       context: context,
@@ -170,74 +167,97 @@ class _ProfilePageState extends State<ProfilePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 24,
-            right: 24,
-            top: 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Cambia Password",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black,
-                ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 24,
+          right: 24,
+          top: 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Cambia Password",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black,
               ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                "Vecchia Password",
-                oldPasswordController,
-                true,
-                isDark,
-              ),
-              const SizedBox(height: 15),
-              _buildTextField(
-                "Nuova Password",
-                newPasswordController,
-                true,
-                isDark,
-              ),
-              const SizedBox(height: 15),
-              _buildTextField(
-                "Conferma Nuova Password",
-                confirmPasswordController,
-                true,
-                isDark,
-              ),
-              const SizedBox(height: 25),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark
-                        ? Colors.white
-                        : const Color(0xFF333333),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
+            ),
+            const SizedBox(height: 20),
+            _buildTextField(
+              "Vecchia Password",
+              oldPasswordController,
+              true,
+              isDark,
+            ),
+            const SizedBox(height: 15),
+            _buildTextField(
+              "Nuova Password",
+              newPasswordController,
+              true,
+              isDark,
+            ),
+            const SizedBox(height: 15),
+            _buildTextField(
+              "Conferma Nuova Password",
+              confirmPasswordController,
+              true,
+              isDark,
+            ),
+            const SizedBox(height: 25),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark
+                      ? Colors.white
+                      : const Color(0xFF333333),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                  onPressed: () async {
-                          /* Logica Firebase... */
-                        },
-                  child: Text(
-                          "Aggiorna Password",
-                          style: TextStyle(
-                            color: isDark ? Colors.black : Colors.white,
-                          ),
-                        ),
+                ),
+                onPressed: () async {
+                  if (newPasswordController.text !=
+                      confirmPasswordController.text) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Le password non coincidono"),
+                      ),
+                    );
+                    return;
+                  }
+                  try {
+                    User? user = FirebaseAuth.instance.currentUser;
+                    AuthCredential credential = EmailAuthProvider.credential(
+                      email: user!.email!,
+                      password: oldPasswordController.text,
+                    );
+                    await user.reauthenticateWithCredential(credential);
+                    await user.updatePassword(newPasswordController.text);
+                    if (mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Password aggiornata!")),
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Errore: ${e.toString()}")),
+                    );
+                  }
+                },
+                child: Text(
+                  "Aggiorna Password",
+                  style: TextStyle(color: isDark ? Colors.black : Colors.white),
                 ),
               ),
-              const SizedBox(height: 30),
-            ],
-          ),
+            ),
+            const SizedBox(height: 30),
+          ],
         ),
       ),
     );
@@ -274,8 +294,11 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: isDark
           ? const Color(0xFF121212)
           : const Color(0xFFF1F3F4),
-      body: FutureBuilder<DocumentSnapshot>(
-        future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -372,13 +395,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       onTap: () => _showChangePassword(context),
                     ),
                     _buildSwitchRow(
-                      Icons.notifications_none,
-                      "Notifiche",
-                      true,
-                      isDark,
-                      showDivider: true,
-                    ),
-                    _buildSwitchRow(
                       Icons.dark_mode_outlined,
                       "Modalità oscura",
                       isDark,
@@ -391,7 +407,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
               const SizedBox(height: 25),
               const Text(
-                "Dati dell'applicazione",
+                "Il tuo impatto ambientale",
                 style: TextStyle(
                   color: Colors.grey,
                   fontSize: 13,
@@ -443,7 +459,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           Expanded(
                             child: _buildStatItem(
                               "Soldi risparmiati",
-                              "€${userData['risparmio'] ?? '0'}",
+                              "€ ${userData['risparmio']?.toStringAsFixed(2) ?? '0.00'}",
                               isDark,
                             ),
                           ),
@@ -456,8 +472,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                           Expanded(
                             child: _buildStatItem(
-                              "Tempo risparmiato",
-                              "${userData['tempo'] ?? '0'}m",
+                              "CO2 risparmiata",
+                              "${userData['co2_risparmiata']?.toStringAsFixed(1) ?? '0.0'} kg",
                               isDark,
                             ),
                           ),
@@ -476,7 +492,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   Icons.info_outline,
                   "Informazioni",
                   isDark,
-                  onTap: () => _showInfoBottomSheet(context), // COLLEGATO!
+                  onTap: () => _showInfoBottomSheet(context),
                 ),
               ),
 
@@ -544,42 +560,30 @@ class _ProfilePageState extends State<ProfilePage> {
     String title,
     bool value,
     bool isDark, {
-    bool showDivider = false,
     Function(bool)? onChanged,
   }) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Row(
-            children: [
-              const SizedBox(width: 4),
-              Icon(icon, color: isDark ? Colors.white70 : Colors.black87),
-              const SizedBox(width: 15),
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : Colors.black,
-                ),
-              ),
-              const Spacer(),
-              Switch(
-                value: value,
-                onChanged: onChanged,
-                activeColor: const Color(0xFF4A7D91),
-              ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          const SizedBox(width: 4),
+          Icon(icon, color: isDark ? Colors.white70 : Colors.black87),
+          const SizedBox(width: 15),
+          Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : Colors.black,
+            ),
           ),
-        ),
-        if (showDivider)
-          Divider(
-            height: 1,
-            indent: 55,
-            endIndent: 20,
-            color: isDark ? Colors.white10 : const Color(0xFFF1F3F4),
+          const Spacer(),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: const Color(0xFF4A7D91),
           ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -588,12 +592,19 @@ class _ProfilePageState extends State<ProfilePage> {
       padding: const EdgeInsets.symmetric(vertical: 25),
       child: Column(
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.grey,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
             value,
             style: TextStyle(
-              fontSize: 28,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
               color: isDark ? Colors.white : Colors.black,
             ),
@@ -604,27 +615,49 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildLogoutButton(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFC35F53),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.person_remove_outlined, color: Colors.white),
-          SizedBox(width: 15),
-          Text(
-            "Logout",
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+    return InkWell(
+      onTap: () async {
+        bool? confirm = await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Logout"),
+            content: const Text("Sei sicuro di voler uscire?"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("ANNULLA"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text("ESCI", style: TextStyle(color: Colors.red)),
+              ),
+            ],
           ),
-          Spacer(),
-          Icon(Icons.logout, color: Colors.white),
-        ],
+        );
+        if (confirm == true) await FirebaseAuth.instance.signOut();
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFC35F53),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.logout, color: Colors.white),
+            SizedBox(width: 15),
+            Text(
+              "Esci dall'account",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -21,10 +21,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
       if (mounted) {
         if (user != null) {
-          // L'utente è loggato! Vai in Home
+          // L'utente è loggato
           Navigator.of(context).pushReplacementNamed('/home');
         } else {
-          // Nessun utente, vai al Login
+          // Nessun utente
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const AuthPage()),
           );
@@ -39,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: const Color(0xFFF5F5F5),
       body: Stack(
         children: [
-          // Sfondo con la sfumatura blu/azzurra in basso a destra
+          // Sfondo 
           Positioned.fill(
             child: Container(
               decoration: const BoxDecoration(
@@ -47,8 +47,8 @@ class _SplashScreenState extends State<SplashScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomRight,
                   colors: [
-                    Color.fromARGB(255, 255, 255, 255), // Chiaro in alto
-                    Color(0xFF4A7D91), // Blu in basso
+                    Color.fromARGB(255, 255, 255, 255), 
+                    Color(0xFF4A7D91), 
                   ],
                   stops: [0.4, 1.0], // La sfumatura inizia a metà schermo
                 ),
@@ -56,12 +56,12 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
           ),
 
-          // Logo posizionato nella parte alta (non al centro perfetto)
+          // Logo 
           Align(
             alignment: const Alignment(
               0,
               -0.4,
-            ), // -1 è l'estremità superiore, 0 è il centro
+            ), 
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [

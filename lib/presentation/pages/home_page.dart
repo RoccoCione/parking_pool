@@ -19,7 +19,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final isDark = Provider.of<ThemeService>(context).isDarkMode;
 
-    // Usiamo LayoutBuilder per conoscere l'altezza esatta dello schermo disponibile
     return LayoutBuilder(
       builder: (context, constraints) {
         return Stack(
@@ -41,12 +40,10 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // LIVELLO 1: NOME UTENTE (In alto)
             Positioned(
               top: 60,
               left: 20,
               child: Material(
-                // Material serve per far renderizzare il testo correttamente dentro uno Stack
                 color: Colors.transparent,
                 child: FutureBuilder<DocumentSnapshot>(
                   future: FirebaseFirestore.instance
@@ -71,10 +68,9 @@ class _HomePageState extends State<HomePage> {
             ),
 
             // LIVELLO 2: PULSANTE NERO "ESCO"
-            // Lo posizioniamo a metà altezza per essere sicuri di vederlo, poi lo abbasseremo
             Positioned(
               bottom:
-                  120, // Se non lo vedi, prova ad aumentare questo numero a 200
+                  120, 
               right: 20,
               child: GestureDetector(
                 onTap: () {

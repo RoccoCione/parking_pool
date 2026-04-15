@@ -96,10 +96,8 @@ class _AuthPageState extends State<AuthPage> {
         print("Registrazione completata e dati salvati su Firestore!");
       }
 
-      // IL PUNTO CRITICO: La navigazione
       if (mounted) {
         print("Navigazione verso MainWrapper...");
-        // Proviamo la navigazione diretta se la rotta nominata fallisce
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => MainWrapper()),
@@ -236,7 +234,6 @@ class _AuthPageState extends State<AuthPage> {
     );
   }
 
-  // I metodi _buildStatusDropdown e _buildAuthSwitcher rimangono uguali a prima
   Widget _buildStatusDropdown() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
