@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../../main.dart';
+import '../../environmental_calculator.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -21,61 +22,202 @@ class _ProfilePageState extends State<ProfilePage> {
       isScrollControlled: true,
       backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
       ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white24 : Colors.grey[300],
-                borderRadius: BorderRadius.circular(10),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              // Handle superiore
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-            ),
-            const SizedBox(height: 25),
-            const Icon(Icons.info_outline, size: 50, color: Color(0xFF4A7D91)),
-            const SizedBox(height: 15),
-            Text(
-              "Cos'è Parking Pool?",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black,
+              const SizedBox(height: 25),
+              const Icon(
+                Icons.auto_awesome,
+                size: 50,
+                color: Color(0xFF4A7D91),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              "Parking Pool è un'iniziativa nata per semplificare la ricerca del parcheggio all'interno della nostra comunità. \n\n"
-              "L'obiettivo è creare una rete collaborativa: chi sta per lasciare un posto auto può segnalarlo in tempo reale, riducendo drasticamente il 'cruising for parking' e le emissioni di CO2 del campus.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: isDark ? Colors.white70 : Colors.black87,
-                height: 1.5,
+              const SizedBox(height: 15),
+              Text(
+                "Visione e Funzionamento",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
               ),
-            ),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  "Ho capito",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: isDark ? Colors.white : const Color(0xFF4A7D91),
+              const SizedBox(height: 25),
+
+              // --- 1. LA MISSIONE ---
+              _buildSectionTitle("LA NOSTRA MISSIONE"),
+              Text(
+                "Parking Pool nasce per risolvere il paradosso del traffico urbano: milioni di ore perse ogni anno alla ricerca di un posto auto che qualcuno ha appena lasciato libero. Trasformiamo la ricerca individuale in un gesto collettivo.",
+                textAlign: TextAlign.justify,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 25),
+
+              // --- 2. UX RESEARCH (Questionario) ---
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4A7D91).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFF4A7D91).withOpacity(0.3),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      "DATI DALLA RICERCA",
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF4A7D91),
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      "Il nostro algoritmo si basa sui risultati di un questionario somministrato a utenti reali, dal quale è emerso che il tempo medio speso alla ricerca di un parcheggio è di circa ${EnvironmentalCalculator.minutiDefaultCruising} minuti per sessione.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              // --- 4. LOGICA DI CALCOLO SCIENTIFICA ---
+              _buildSectionTitle("MODELLO DI CALCOLO AMBIENTALE"),
+              _buildInfoCard(
+                isDark,
+                Icons.settings_suggest_outlined,
+                "Algoritmo Dinamico",
+                "Il calcolo analizza il consumo 'Idle' specifico per la tua motorizzazione (Benzina, Diesel, GPL, Elettrico) e cilindrata.",
+              ),
+              const SizedBox(height: 12),
+              _buildInfoCard(
+                isDark,
+                Icons.speed, // In alternativa a co2 se dà errori
+                "Cruising vs Idle",
+                "Il sistema stima che durante la ricerca attiva del posto (Cruising) il consumo sia 2.5 volte superiore al minimo: Parking Pool azzera questo spreco.",
+              ),
+              const SizedBox(height: 12),
+              _buildInfoCard(
+                isDark,
+                Icons.cloud_outlined,
+                "Coefficienti CO2",
+                "Applichiamo standard di emissione certificati (2.3kg/L Benzina, 2.6kg/L Diesel) pesati in base all'anzianità (Classe Euro) del tuo veicolo.",
+              ),
+
+              const SizedBox(height: 40),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A7D91),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    elevation: 0,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    "HO CAPITO TUTTO",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-          ],
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  // --- HELPER WIDGETS ---
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF4A7D91),
+            letterSpacing: 1.2,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(bool isDark, IconData icon, String title, String body) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFF4A7D91), size: 24),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  body,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white60 : Colors.black54,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
