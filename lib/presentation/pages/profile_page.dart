@@ -13,7 +13,116 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // --- FUNZIONE INFORMAZIONI ---
+  String _formatSafeNumber(dynamic value, int decimals) {
+    if (value == null) return "0.${'0' * decimals}";
+
+    if (value is num) return value.toStringAsFixed(decimals);
+
+    if (value is String) {
+      String cleanString = value.replaceAll(RegExp(r'[^0-9\.]'), '');
+      double? parsed = double.tryParse(cleanString);
+      return parsed?.toStringAsFixed(decimals) ?? "0.${'0' * decimals}";
+    }
+
+    return "0.${'0' * decimals}";
+  }
+
+  // --- FUNZIONE COME FUNZIONA ---
+  void _showHowItWorksBottomSheet(BuildContext context) {
+    final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 25),
+              const Icon(
+                Icons.help_outline_rounded,
+                size: 50,
+                color: Color(0xFF4A7D91),
+              ),
+              const SizedBox(height: 15),
+              Text(
+                "Come funziona l'app",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              _buildInfoCard(
+                isDark,
+                Icons.location_on_rounded,
+                "1. Stai uscendo?",
+                "Premi il tasto 'Esco', seleziona l'area del campus in cui ti trovi e posiziona il marker nero sulla mappa. Gli altri utenti vedranno che stai per liberare un posto.",
+              ),
+              const SizedBox(height: 15),
+              _buildInfoCard(
+                isDark,
+                Icons.local_parking_rounded,
+                "2. Cerchi parcheggio?",
+                "Esplora la mappa e cerca i pin blu 'P'. Cliccaci sopra per vedere i dettagli dell'utente che sta uscendo e chiedigli di scambiare il posto.",
+              ),
+              const SizedBox(height: 15),
+              _buildInfoCard(
+                isDark,
+                Icons.handshake_rounded,
+                "3. Lo Scambio",
+                "Una volta accordati, parcheggia comodamente al suo posto. Contribuirai a ridurre il traffico e le emissioni nel nostro Campus!",
+              ),
+
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A7D91),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    elevation: 0,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    "HO CAPITO",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- FUNZIONE INFORMAZIONI E IMPATTO ---
   void _showInfoBottomSheet(BuildContext context) {
     final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
 
@@ -34,7 +143,6 @@ class _ProfilePageState extends State<ProfilePage> {
           padding: const EdgeInsets.all(24.0),
           child: Column(
             children: [
-              // Handle superiore
               Container(
                 width: 40,
                 height: 4,
@@ -51,7 +159,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 15),
               Text(
-                "Visione e Funzionamento",
+                "La nostra Missione",
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -60,8 +168,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 25),
 
-              // --- 1. LA MISSIONE ---
-              _buildSectionTitle("LA NOSTRA MISSIONE"),
+              _buildSectionTitle("VISION"),
               Text(
                 "Parking Pool nasce per risolvere il paradosso del traffico urbano: milioni di ore perse ogni anno alla ricerca di un posto auto che qualcuno ha appena lasciato libero. Trasformiamo la ricerca individuale in un gesto collettivo.",
                 textAlign: TextAlign.justify,
@@ -73,7 +180,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 25),
 
-              // --- 2. UX RESEARCH (Questionario) ---
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -110,31 +216,29 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 30),
 
-              // --- 4. LOGICA DI CALCOLO SCIENTIFICA ---
-              _buildSectionTitle("MODELLO DI CALCOLO AMBIENTALE"),
+              _buildSectionTitle("MODELLO AMBIENTALE"),
               _buildInfoCard(
                 isDark,
                 Icons.settings_suggest_outlined,
                 "Algoritmo Dinamico",
-                "Il calcolo analizza il consumo 'Idle' specifico per la tua motorizzazione (Benzina, Diesel, GPL, Elettrico) e cilindrata.",
+                "Il calcolo analizza il consumo specifico per la tua motorizzazione e cilindrata.",
               ),
               const SizedBox(height: 12),
               _buildInfoCard(
                 isDark,
-                Icons.speed, // In alternativa a co2 se dà errori
+                Icons.speed,
                 "Cruising vs Idle",
-                "Il sistema stima che durante la ricerca attiva del posto (Cruising) il consumo sia 2.5 volte superiore al minimo: Parking Pool azzera questo spreco.",
+                "Il sistema stima che durante la ricerca attiva del posto (Cruising) il consumo sia 2.5 volte superiore al minimo.",
               ),
               const SizedBox(height: 12),
               _buildInfoCard(
                 isDark,
                 Icons.cloud_outlined,
                 "Coefficienti CO2",
-                "Applichiamo standard di emissione certificati (2.3kg/L Benzina, 2.6kg/L Diesel) pesati in base all'anzianità (Classe Euro) del tuo veicolo.",
+                "Applichiamo standard di emissione certificati pesati in base all'anzianità (Classe Euro) del tuo veicolo.",
               ),
 
               const SizedBox(height: 40),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -149,7 +253,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   onPressed: () => Navigator.pop(context),
                   child: const Text(
-                    "HO CAPITO TUTTO",
+                    "CHIUDI",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
@@ -598,10 +702,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     IntrinsicHeight(
                       child: Row(
                         children: [
+                          // UTILIZZO DELLA FUNZIONE SICURA QUI SOTTO:
                           Expanded(
                             child: _buildStatItem(
                               "Soldi risparmiati",
-                              "€ ${userData['risparmio']?.toStringAsFixed(2) ?? '0.00'}",
+                              "€ ${_formatSafeNumber(userData['risparmio'], 2)}",
                               isDark,
                             ),
                           ),
@@ -615,7 +720,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           Expanded(
                             child: _buildStatItem(
                               "CO2 risparmiata",
-                              "${userData['co2_risparmiata']?.toStringAsFixed(1) ?? '0.0'} kg",
+                              "${_formatSafeNumber(userData['co2_risparmiata'], 1)} kg",
                               isDark,
                             ),
                           ),
@@ -626,19 +731,40 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
 
-              const SizedBox(height: 15),
+              const SizedBox(height: 25),
+              const Text(
+                "Info e Supporto",
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+
               _buildSectionCard(
                 isDark: isDark,
                 padding: EdgeInsets.zero,
-                child: _buildRowTile(
-                  Icons.info_outline,
-                  "Informazioni",
-                  isDark,
-                  onTap: () => _showInfoBottomSheet(context),
+                child: Column(
+                  children: [
+                    _buildRowTile(
+                      Icons.help_outline_rounded,
+                      "Come funziona",
+                      isDark,
+                      showDivider: true,
+                      onTap: () => _showHowItWorksBottomSheet(context),
+                    ),
+                    _buildRowTile(
+                      Icons.info_outline,
+                      "Informazioni e Impatto",
+                      isDark,
+                      onTap: () => _showInfoBottomSheet(context),
+                    ),
+                  ],
                 ),
               ),
 
-              const SizedBox(height: 15),
+              const SizedBox(height: 25),
               _buildLogoutButton(context),
               const SizedBox(height: 100),
             ],
@@ -648,7 +774,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // --- HELPER WIDGETS ---
+  // --- HELPER WIDGETS STRUTTURALI ---
   Widget _buildSectionCard({
     required Widget child,
     required bool isDark,
@@ -756,6 +882,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  // Tasto Logout
   Widget _buildLogoutButton(BuildContext context) {
     return InkWell(
       onTap: () async {
@@ -776,7 +903,17 @@ class _ProfilePageState extends State<ProfilePage> {
             ],
           ),
         );
-        if (confirm == true) await FirebaseAuth.instance.signOut();
+
+        if (confirm == true) {
+          await FirebaseAuth.instance.signOut();
+          if (context.mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/auth',
+              (route) => false,
+            );
+          }
+        }
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(

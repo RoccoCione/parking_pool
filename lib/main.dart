@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:provider/provider.dart'; // Import necessario per il tema
+import 'package:provider/provider.dart';
 import 'package:parking_pool/presentation/pages/main_wrapper.dart';
 import 'firebase_options.dart';
 import 'presentation/pages/splash_screen.dart';
 import 'presentation/pages/auth_page.dart';
+import 'presentation/pages/on_boarding_page.dart';
 
-// --- SERVICE PER IL TEMA (Puoi metterlo anche in un file separato theme_service.dart) ---
+// --- SERVICE PER IL TEMA ---
 class ThemeService extends ChangeNotifier {
   bool _isDarkMode = false;
   bool get isDarkMode => _isDarkMode;
@@ -22,16 +23,11 @@ class ThemeService extends ChangeNotifier {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   runApp(
     // Avvolgiamo l'app con il Provider per il Tema
-    ChangeNotifierProvider(
-      create: (_) => ThemeService(),
-      child: const MyApp(),
-    ),
+    ChangeNotifierProvider(create: (_) => ThemeService(), child: const MyApp()),
   );
 }
 
@@ -46,7 +42,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Parking Pool',
-      
+
       // CONFIGURAZIONE TEMA LIGHT
       theme: ThemeData(
         useMaterial3: true,
@@ -74,10 +70,13 @@ class MyApp extends StatelessWidget {
       // Impostiamo quale tema usare in base allo stato del service
       themeMode: themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light,
 
+      // DEFINIZIONE ROTTE
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/auth': (context) => const AuthPage(),
-        '/home': (context) => const MainWrapper(), 
+        '/onboarding': (context) =>
+            const OnboardingPage(), // <-- Nuova rotta aggiunta!
+        '/home': (context) => const MainWrapper(),
       },
       home: const SplashScreen(),
     );

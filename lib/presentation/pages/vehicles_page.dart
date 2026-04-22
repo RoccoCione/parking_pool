@@ -1,9 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../main.dart';
 
@@ -25,6 +22,22 @@ class _VehiclesPageState extends State<VehiclesPage> {
     super.dispose();
   }
 
+  // --- HELPER: ICONA DINAMICA ---
+  // Restituisce l'icona corretta in base al tipo di carburante scelto
+  IconData _getVehicleIcon(String? carburante) {
+    switch (carburante?.toLowerCase()) {
+      case 'elettrica':
+        return Icons.electric_car_rounded;
+      case 'ibrida':
+        return Icons.electric_bolt_rounded;
+      case 'gpl':
+      case 'metano':
+        return Icons.eco_rounded;
+      default:
+        return Icons.directions_car_rounded;
+    }
+  }
+
   // --- LOGICA NAVIGAZIONE ---
   void _navigateVehicles(int direction, int totalItems) {
     int nextIndex = _currentVehicleIndex + direction;
@@ -39,7 +52,7 @@ class _VehiclesPageState extends State<VehiclesPage> {
   }
 
   // --- LOGICA ELIMINAZIONE VEICOLO ---
-  Future<void> _deleteVehicle(String vehicleId, String? imageUrl) async {
+  Future<void> _deleteVehicle(String vehicleId) async {
     bool confirm =
         await showDialog(
           context: context,
@@ -71,49 +84,28 @@ class _VehiclesPageState extends State<VehiclesPage> {
             .collection('vehicles')
             .doc(vehicleId)
             .delete();
-        if (imageUrl != null && imageUrl.isNotEmpty) {
-          await FirebaseStorage.instance.refFromURL(imageUrl).delete();
+        if (mounted) {
+          Navigator.pop(context); // Chiude il BottomSheet dei dettagli
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text("Veicolo eliminato")));
         }
-        Navigator.pop(context);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Veicolo eliminato")));
       } catch (e) {
         debugPrint("Errore: $e");
       }
     }
   }
 
-  // --- LOGICA CARICAMENTO IMMAGINE ---
-  Future<String?> _pickAndUploadImage() async {
-    final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 70,
-    );
-    if (image == null) return null;
-    File file = File(image.path);
-    String fileName =
-        'vehicles/${uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    try {
-      TaskSnapshot snapshot = await FirebaseStorage.instance
-          .ref(fileName)
-          .putFile(file);
-      return await snapshot.ref.getDownloadURL();
-    } catch (e) {
-      return null;
-    }
-  }
-
   // --- POPUP DETTAGLI ---
   void _showVehicleDetailsSheet(Map<String, dynamic> vehicle, String docId) {
     final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
+        height: MediaQuery.of(context).size.height * 0.70,
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(35)),
@@ -134,17 +126,11 @@ class _VehiclesPageState extends State<VehiclesPage> {
                 padding: const EdgeInsets.all(25),
                 children: [
                   Center(
-                    child: vehicle['imageUrl'] != null
-                        ? Image.network(
-                            vehicle['imageUrl'],
-                            height: 140,
-                            fit: BoxFit.contain,
-                          )
-                        : Icon(
-                            Icons.directions_car,
-                            size: 80,
-                            color: isDark ? Colors.white12 : Colors.grey[300],
-                          ),
+                    child: Icon(
+                      _getVehicleIcon(vehicle['carburante']),
+                      size: 100,
+                      color: const Color(0xFF4A7D91),
+                    ),
                   ),
                   const SizedBox(height: 20),
                   Center(
@@ -165,7 +151,7 @@ class _VehiclesPageState extends State<VehiclesPage> {
                         "Cilindrata",
                         "${vehicle['cilindrata'] ?? '-'} Cc",
                         isDark,
-                      ), 
+                      ),
                       _buildInfoChip(
                         "Anno",
                         vehicle['anno']?.toString() ?? '-',
@@ -180,7 +166,7 @@ class _VehiclesPageState extends State<VehiclesPage> {
                   ),
                   const SizedBox(height: 40),
                   TextButton.icon(
-                    onPressed: () => _deleteVehicle(docId, vehicle['imageUrl']),
+                    onPressed: () => _deleteVehicle(docId),
                     icon: const Icon(
                       Icons.delete_outline,
                       color: Colors.redAccent,
@@ -212,15 +198,11 @@ class _VehiclesPageState extends State<VehiclesPage> {
   // --- POPUP AGGIUNTA ---
   void _showAddVehicleSheet() {
     final isDark = Provider.of<ThemeService>(context, listen: false).isDarkMode;
-    final PageController sheetPageController = PageController();
     final nomeController = TextEditingController();
-    final cilindrataController = TextEditingController(text: "1.2");
-    final annoController = TextEditingController(text: "2018");
+    final cilindrataController = TextEditingController();
+    final annoController = TextEditingController();
     final noteController = TextEditingController();
-    String selectedCarburante = 'Benzina'; // Valore iniziale
-    String? imageUrl;
-    bool isUploading = false;
-    int currentSheetPage = 0;
+    String selectedCarburante = 'Benzina';
 
     showModalBottomSheet(
       context: context,
@@ -228,159 +210,170 @@ class _VehiclesPageState extends State<VehiclesPage> {
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
-          height: MediaQuery.of(context).size.height * 0.85,
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(35)),
           ),
-          child: Column(
-            children: [
-              _buildSheetHeader(isDark),
-              Expanded(
-                child: PageView(
-                  controller: sheetPageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onPageChanged: (index) =>
-                      setModalState(() => currentSheetPage = index),
-                  children: [
-                    _buildStepImage(
-                      setModalState,
-                      imageUrl,
-                      isUploading,
-                      isDark,
-                      () async {
-                        setModalState(() => isUploading = true);
-                        String? url = await _pickAndUploadImage();
-                        setModalState(() {
-                          imageUrl = url;
-                          isUploading = false;
-                        });
-                      },
-                    ),
-                    _buildStepInfo(
-                      nomeController,
-                      cilindrataController,
-                      annoController,
-                      noteController,
-                      selectedCarburante,
-                      isDark,
-                      (val) => setModalState(() => selectedCarburante = val!),
-                    ),
-                  ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildSheetHeader(isDark),
+                Padding(
+                  padding: const EdgeInsets.all(25),
+                  child: Column(
+                    children: [
+                      // Anteprima Icona dinamica in base alla scelta
+                      Icon(
+                        _getVehicleIcon(selectedCarburante),
+                        size: 60,
+                        color: const Color(0xFF4A7D91),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildTextField(
+                        nomeController,
+                        "Modello (es. Fiat Punto)",
+                        isDark,
+                      ),
+                      const SizedBox(height: 15),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              cilindrataController,
+                              "Cilindrata (es. 1.2)",
+                              isDark,
+                              keyboard: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 15),
+                          Expanded(
+                            child: _buildTextField(
+                              annoController,
+                              "Anno",
+                              isDark,
+                              keyboard: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      DropdownButtonFormField<String>(
+                        value: selectedCarburante,
+                        dropdownColor: isDark
+                            ? const Color(0xFF1E1E1E)
+                            : Colors.white,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: "Carburante",
+                          labelStyle: TextStyle(
+                            color: isDark ? Colors.white38 : Colors.grey,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        items:
+                            [
+                                  "Benzina",
+                                  "Diesel",
+                                  "GPL",
+                                  "Metano",
+                                  "Ibrida",
+                                  "Elettrica",
+                                ]
+                                .map(
+                                  (e) => DropdownMenuItem(
+                                    value: e,
+                                    child: Text(e),
+                                  ),
+                                )
+                                .toList(),
+                        onChanged: (val) =>
+                            setModalState(() => selectedCarburante = val!),
+                      ),
+                      const SizedBox(height: 30),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4A7D91),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                          ),
+                          onPressed: () async {
+                            // Validazione base
+                            if (nomeController.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    "Inserisci il modello del veicolo",
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+
+                            await FirebaseFirestore.instance
+                                .collection('vehicles')
+                                .add({
+                                  'uid': uid,
+                                  'nome': nomeController.text.trim(),
+                                  'cilindrata':
+                                      double.tryParse(
+                                        cilindrataController.text.replaceAll(
+                                          ',',
+                                          '.',
+                                        ),
+                                      ) ??
+                                      1.2,
+                                  'anno':
+                                      int.tryParse(annoController.text) ??
+                                      DateTime.now().year,
+                                  'carburante': selectedCarburante,
+                                  'note': noteController.text.trim(),
+                                  'imageUrl': null,
+                                  'is_active': true,
+                                  'createdAt': FieldValue.serverTimestamp(),
+                                });
+
+                            if (mounted) Navigator.pop(context);
+                          },
+                          child: const Text(
+                            "Salva nel Garage",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
-              ),
-              _buildSheetFooter(
-                currentSheetPage,
-                sheetPageController,
-                () async {
-                  
-                  await FirebaseFirestore.instance.collection('vehicles').add({
-                    'uid': uid,
-                    'nome': nomeController.text.trim(),
-                    'cilindrata':
-                        double.tryParse(cilindrataController.text) ??
-                        1.2, 
-                    'anno':
-                        int.tryParse(annoController.text) ??
-                        2018, 
-                    'carburante': selectedCarburante,
-                    'note': noteController.text.trim(),
-                    'imageUrl': imageUrl,
-                    'is_active': true,
-                    'createdAt': FieldValue.serverTimestamp(),
-                  });
-                  Navigator.pop(context);
-                },
-                isDark,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // --- UI STEPS & HELPERS ---
-
-  Widget _buildStepInfo(
-    TextEditingController nome,
-    TextEditingController cil,
-    TextEditingController anno,
-    TextEditingController note,
-    String carburante,
-    bool isDark,
-    Function(String?) onCarburanteChanged,
-  ) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(25),
-      child: Column(
-        children: [
-          Text(
-            "Dettagli Tecnici",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black,
-            ),
-          ),
-          const SizedBox(height: 20),
-          _buildTextField(nome, "Modello (es. Fiat Punto)", isDark),
-          const SizedBox(height: 15),
-          Row(
-            children: [
-              Expanded(
-                child: _buildTextField(
-                  cil,
-                  "Cilindrata (es. 1.2)",
-                  isDark,
-                  keyboard: TextInputType.number,
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: _buildTextField(
-                  anno,
-                  "Anno (es. 2015)",
-                  isDark,
-                  keyboard: TextInputType.number,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 15),
-          DropdownButtonFormField<String>(
-            value: carburante,
-            dropdownColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-            style: TextStyle(color: isDark ? Colors.white : Colors.black),
-            decoration: InputDecoration(
-              labelText: "Carburante",
-              labelStyle: TextStyle(
-                color: isDark ? Colors.white38 : Colors.grey,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-            ),
-            items: [
-              "Benzina",
-              "Diesel",
-              "GPL",
-              "Metano",
-              "Ibrida",
-              "Elettrica",
-            ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-            onChanged: onCarburanteChanged,
-          ),
-          const SizedBox(height: 15),
-          _buildTextField(note, "Note aggiuntive", isDark, maxLines: 2),
-        ],
-      ),
-    );
-  }
+  // --- HELPERS UI ---
 
   Widget _buildSheetHeader(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Row(
         children: [
           Container(
@@ -417,119 +410,24 @@ class _VehiclesPageState extends State<VehiclesPage> {
     );
   }
 
-  Widget _buildSheetFooter(
-    int page,
-    PageController controller,
-    VoidCallback onSave,
-    bool isDark,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(25, 10, 25, 30),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _dot(page == 0, isDark),
-              const SizedBox(width: 8),
-              _dot(page == 1, isDark),
-            ],
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4A7D91),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-              ),
-              onPressed: page == 0
-                  ? () => controller.nextPage(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    )
-                  : onSave,
-              child: Text(
-                page == 0 ? "Continua" : "Salva nel Garage",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- WIDGETS MINORI ---
-
   Widget _buildTextField(
     TextEditingController controller,
     String hint,
     bool isDark, {
-    int maxLines = 1,
     TextInputType keyboard = TextInputType.text,
   }) {
     return TextField(
       controller: controller,
-      maxLines: maxLines,
       keyboardType: keyboard,
       style: TextStyle(color: isDark ? Colors.white : Colors.black),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: isDark ? Colors.white24 : Colors.grey),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-      ),
-    );
-  }
-
-  Widget _buildStepImage(
-    StateSetter setModalState,
-    String? imageUrl,
-    bool isUploading,
-    bool isDark,
-    VoidCallback onPick,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.all(25),
-      child: Column(
-        children: [
-          const Text(
-            "Immagine del veicolo",
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 30),
-          Container(
-            height: 200,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: isDark ? Colors.white12 : Colors.grey[300]!,
-              ),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: isUploading
-                ? const Center(child: CircularProgressIndicator())
-                : (imageUrl == null
-                      ? Center(
-                          child: TextButton.icon(
-                            onPressed: onPick,
-                            icon: const Icon(Icons.add_a_photo),
-                            label: const Text("Carica Foto"),
-                          ),
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
-                          child: Image.network(imageUrl, fit: BoxFit.contain),
-                        )),
-          ),
-        ],
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 15,
+          vertical: 15,
+        ),
       ),
     );
   }
@@ -584,6 +482,7 @@ class _VehiclesPageState extends State<VehiclesPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Provider.of<ThemeService>(context).isDarkMode;
+
     return Scaffold(
       backgroundColor: isDark
           ? const Color(0xFF121212)
@@ -597,18 +496,36 @@ class _VehiclesPageState extends State<VehiclesPage> {
           builder: (context, snapshot) {
             if (!snapshot.hasData)
               return const Center(child: CircularProgressIndicator());
+
             final docs = snapshot.data!.docs;
-            if (docs.isEmpty)
+
+            if (docs.isEmpty) {
               return Center(
-                child: Text(
-                  "Garage vuoto",
-                  style: TextStyle(
-                    color: isDark ? Colors.white38 : Colors.grey,
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.garage_outlined,
+                      size: 80,
+                      color: isDark ? Colors.white24 : Colors.grey[400],
+                    ),
+                    const SizedBox(height: 15),
+                    Text(
+                      "Il tuo garage è vuoto",
+                      style: TextStyle(
+                        color: isDark ? Colors.white38 : Colors.grey,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
                 ),
               );
-            if (_currentVehicleIndex >= docs.length)
+            }
+
+            if (_currentVehicleIndex >= docs.length) {
               _currentVehicleIndex = docs.length - 1;
+            }
+
             return Column(
               children: [
                 const SizedBox(height: 40),
@@ -627,13 +544,11 @@ class _VehiclesPageState extends State<VehiclesPage> {
                         itemBuilder: (context, index) {
                           var v = docs[index].data() as Map<String, dynamic>;
                           return Center(
-                            child: v['imageUrl'] != null
-                                ? Image.network(
-                                    v['imageUrl'],
-                                    width: 320,
-                                    fit: BoxFit.contain,
-                                  )
-                                : const Icon(Icons.directions_car, size: 120),
+                            child: Icon(
+                              _getVehicleIcon(v['carburante']),
+                              size: 150,
+                              color: const Color(0xFF4A7D91),
+                            ),
                           );
                         },
                       ),

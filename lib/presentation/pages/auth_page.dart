@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:parking_pool/presentation/pages/main_wrapper.dart';
 import '../../data/datasources/auth_service.dart';
 import '../widgets/custom_text_field.dart';
+import 'on_boarding_page.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -80,12 +81,23 @@ class _AuthPageState extends State<AuthPage> {
 
     try {
       if (_isLogin) {
+        // --- LOGICA LOGIN ---
         await _authService.loginUser(
           _usernameController.text.trim(),
           _passwordController.text.trim(),
         );
         print("Login effettuato con successo!");
+
+        if (mounted) {
+          print("Navigazione verso MainWrapper...");
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const MainWrapper()),
+            (route) => false,
+          );
+        }
       } else {
+        // --- LOGICA REGISTRAZIONE ---
         await _authService.registerUser(
           username: _usernameController.text.trim(),
           password: _passwordController.text.trim(),
@@ -94,15 +106,15 @@ class _AuthPageState extends State<AuthPage> {
           status: _selectedStatus,
         );
         print("Registrazione completata e dati salvati su Firestore!");
-      }
 
-      if (mounted) {
-        print("Navigazione verso MainWrapper...");
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => MainWrapper()),
-          (route) => false,
-        );
+        if (mounted) {
+          print("Navigazione verso OnboardingPage...");
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const OnboardingPage()),
+            (route) => false,
+          );
+        }
       }
     } catch (e) {
       print("ERRORE DURANTE L'AUTH: $e");

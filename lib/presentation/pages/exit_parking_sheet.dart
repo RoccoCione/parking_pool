@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import '../../main.dart';
 import 'map_page.dart';
 import '../../environmental_calculator.dart';
-import '../widgets/temp_chat_widget.dart'; // Import per la chat
+import '../widgets/temp_chat_widget.dart';
 
 class ExitParkingSheet extends StatefulWidget {
   const ExitParkingSheet({super.key});
@@ -19,10 +19,13 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
   bool _isPublished = false;
   int _selectedTimer = 5;
   bool _isAnonymous = false;
-  bool _acceptChatRequest = false; // Stato per il consenso chat dell'uscente
+  bool _acceptChatRequest = false;
   int _currentVehicleIndex = 0;
   String? _currentSlotId;
   String? _activeRequestId;
+
+  // Flag critico per evitare che il cleanup venga chiamato più volte
+  bool _isCleaningUp = false;
 
   Timer? _countdownTimer;
   int _remainingSeconds = 0;
@@ -109,7 +112,7 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
   Future<void> _handleRequest(
     String requestId,
     String newStatus,
-    bool chatAccepted, // Parametro aggiunto per la chat
+    bool chatAccepted,
   ) async {
     if (newStatus == 'rejected') {
       await FirebaseFirestore.instance
@@ -125,7 +128,7 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
           .doc(requestId)
           .update({
             'status': 'in_progress',
-            'owner_chat_consent': chatAccepted, // Salviamo il consenso chat
+            'owner_chat_consent': chatAccepted,
             'confirmation_outgoing': false,
             'confirmation_incoming': false,
           });
@@ -141,15 +144,24 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
 
   Future<void> _confirmExchange() async {
     if (_activeRequestId == null) return;
-    await FirebaseFirestore.instance
-        .collection('exchange_requests')
-        .doc(_activeRequestId)
-        .update({'confirmation_outgoing': true});
+    try {
+      await FirebaseFirestore.instance
+          .collection('exchange_requests')
+          .doc(_activeRequestId)
+          .update({'confirmation_outgoing': true});
+    } catch (e) {
+      debugPrint("Errore conferma uscita: $e");
+    }
   }
 
   Future<void> _handleFinalCleanup(Map<String, dynamic> data) async {
+    if (_isCleaningUp) return;
+    _isCleaningUp = true;
+
     try {
       final String requesterUid = data['requester_uid'];
+
+      // Calcolo impatto ambientale
       final vehicleSnapshot = await FirebaseFirestore.instance
           .collection('vehicles')
           .where('uid', isEqualTo: requesterUid)
@@ -161,8 +173,19 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
 
       if (vehicleSnapshot.docs.isNotEmpty) {
         var vData = vehicleSnapshot.docs.first.data();
+
+        // Recupero cilindrata gestendo sia String che Number
+        dynamic cilindrataRaw = vData['cilindrata'] ?? 1.2;
+        double cilindrataPulita;
+
+        if (cilindrataRaw is String) {
+          cilindrataPulita = double.tryParse(cilindrataRaw) ?? 1.2;
+        } else {
+          cilindrataPulita = (cilindrataRaw as num).toDouble();
+        }
+
         var impact = EnvironmentalCalculator.getImpact(
-          cilindrata: (vData['cilindrata'] ?? 1.2).toDouble(),
+          cilindrata: cilindrataPulita, // Ora è sicuramente un double
           carburante: vData['carburante'] ?? 'Benzina',
           anno: vData['anno'] ?? 2018,
         );
@@ -170,20 +193,27 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
         risparmioCO2 = impact['co2']!;
       }
 
-      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+      // Batch update per atomicità (opzionale ma consigliato)
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+
+      batch.update(FirebaseFirestore.instance.collection('users').doc(uid), {
         'posti_ceduti': FieldValue.increment(1),
       });
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(requesterUid)
-          .update({
-            'posti_ricevuti': FieldValue.increment(1),
-            'risparmio': FieldValue.increment(risparmioEuro),
-            'tempo': FieldValue.increment(5),
-            'co2_risparmiata': FieldValue.increment(risparmioCO2),
-          });
 
-      await FirebaseFirestore.instance.collection('completed_exchanges').add({
+      batch.update(
+        FirebaseFirestore.instance.collection('users').doc(requesterUid),
+        {
+          'posti_ricevuti': FieldValue.increment(1),
+          'risparmio': FieldValue.increment(risparmioEuro),
+          'tempo': FieldValue.increment(5),
+          'co2_risparmiata': FieldValue.increment(risparmioCO2),
+        },
+      );
+
+      DocumentReference completedRef = FirebaseFirestore.instance
+          .collection('completed_exchanges')
+          .doc();
+      batch.set(completedRef, {
         'slot_id': _currentSlotId,
         'requester_uid': requesterUid,
         'owner_uid': uid,
@@ -192,6 +222,9 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
         'timestamp_completion': FieldValue.serverTimestamp(),
       });
 
+      await batch.commit();
+
+      // Pulizia documenti attivi
       if (_currentSlotId != null) await _removeFromFirestore(_currentSlotId!);
       if (_activeRequestId != null) {
         await FirebaseFirestore.instance
@@ -211,6 +244,7 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
       }
     } catch (e) {
       debugPrint("Errore cleanup: $e");
+      _isCleaningUp = false; // Permette di riprovare in caso di errore di rete
     }
   }
 
@@ -300,8 +334,6 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
     );
   }
 
-  // --- UI WIDGETS ---
-
   Widget _buildExchangeInProgressView(bool isDark) {
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
@@ -309,19 +341,19 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
           .doc(_activeRequestId)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || !snapshot.data!.exists)
+        if (!snapshot.hasData || !snapshot.data!.exists) {
           return const Center(child: CircularProgressIndicator());
+        }
+
         var data = snapshot.data!.data() as Map<String, dynamic>;
         bool outConfirmed = data['confirmation_outgoing'] ?? false;
         bool inConfirmed = data['confirmation_incoming'] ?? false;
 
-        if (outConfirmed && inConfirmed) {
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => _handleFinalCleanup(data),
-          );
+        // Se entrambi confermano, avviamo il cleanup una sola volta
+        if (outConfirmed && inConfirmed && !_isCleaningUp) {
+          Future.microtask(() => _handleFinalCleanup(data));
         }
 
-        // Chiamata aggiornata con passaggio dati per la chat
         return _buildInProgressUI(isDark, outConfirmed, data);
       },
     );
@@ -347,8 +379,6 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
           ),
-
-          // Mostriamo l'icona della stretta di mano SOLO se la chat NON è abilitata
           if (!chatEnabled) ...[
             const SizedBox(height: 30),
             const Icon(
@@ -358,8 +388,6 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
             ),
             const SizedBox(height: 20),
           ],
-
-          // --- WIDGET CHAT TEMPORANEA ---
           if (chatEnabled && _activeRequestId != null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),
@@ -382,8 +410,6 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
                 ),
               ),
             ),
-
-          // --- LOGICA BOTTONI DI CONFERMA ---
           if (outConfirmed)
             const Column(
               children: [
@@ -508,7 +534,6 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
               color: isDark ? Colors.white : Colors.black,
             ),
           ),
-
           if (!anonymous) ...[
             Text(
               "${data['requester_nome']} ${data['requester_cognome']}",
@@ -536,7 +561,6 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
               style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
             ),
           ],
-
           const SizedBox(height: 25),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -564,10 +588,8 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
               ),
             ],
           ),
-
           const SizedBox(height: 20),
           const Divider(),
-
           if (requesterWantsChat) ...[
             const SizedBox(height: 10),
             const Text(
@@ -585,7 +607,6 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
               isDark,
             ),
           ],
-
           const SizedBox(height: 30),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -617,8 +638,6 @@ class _ExitParkingSheetState extends State<ExitParkingSheet> {
       ),
     );
   }
-
-  // --- HELPERS ---
 
   Widget _buildCustomToggle(
     String title,
